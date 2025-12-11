@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Logo from "@/components/Logo";
 import LogoIcon from "@/components/LogoIcon";
+import QRSection from "@/components/QRSection";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -192,6 +193,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* QR Code / Smart Instructions Section */}
+      <QRSection />
 
       {/* Pre-order Section */}
       <section id="preorder" className="py-20 px-4 bg-primary">
