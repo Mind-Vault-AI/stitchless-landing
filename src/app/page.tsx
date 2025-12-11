@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Logo from "@/components/Logo";
+import LogoIcon from "@/components/LogoIcon";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -25,7 +27,7 @@ export default function Home() {
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-white/90 backdrop-blur-sm z-50 border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold text-primary">STITCHLESS™</div>
+          <Logo size="small" />
           <a
             href="#preorder"
             className="bg-accent text-white px-6 py-2 rounded-full font-semibold hover:bg-orange-600 transition"
@@ -251,7 +253,10 @@ export default function Home() {
       {/* Footer */}
       <footer className="py-12 px-4 bg-gray-900 text-white">
         <div className="max-w-6xl mx-auto text-center">
-          <div className="text-2xl font-bold mb-4">STITCHLESS™</div>
+          <div className="flex justify-center mb-4">
+            <LogoIcon size={48} />
+          </div>
+          <div className="text-2xl font-bold mb-2">STITCHLESS™</div>
           <p className="text-gray-400 mb-6">
             Revolutionaire wondverzorging. Gemaakt in Nederland.
           </p>
