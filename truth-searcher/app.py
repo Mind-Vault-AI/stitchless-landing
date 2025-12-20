@@ -9,6 +9,7 @@ Author: Truth Searcher Team
 Version: 1.0.0
 """
 
+import json
 import logging
 import os
 import sys
@@ -20,6 +21,7 @@ import streamlit as st
 # Add src to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from health_check import get_health_status
 from src.config import UI_MESSAGES, AppConfig
 from src.market_research import MarketResearch
 from src.pdf_generator import generate_pdf_report, generate_simple_text_report
@@ -301,8 +303,90 @@ def run_research(query: str, config: AppConfig):
         st.session_state.current_phase = None
 
 
+def render_health_check():
+    """Render health check page with JSON output."""
+    st.set_page_config(
+        page_title="Health Check",
+        page_icon="🏥",
+        layout="wide",
+    )
+    
+    st.title("🏥 Health Check")
+    st.markdown("*System health status and monitoring*")
+    
+    with st.spinner("Running health checks..."):
+        health_status = get_health_status()
+    
+    # Display overall status
+    status = health_status["status"]
+    if status == "healthy":
+        st.success(f"✅ System Status: **{status.upper()}**")
+    elif status == "degraded":
+        st.warning(f"⚠️ System Status: **{status.upper()}**")
+    else:
+        st.error(f"❌ System Status: **{status.upper()}**")
+    
+    # Display metrics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Check Time", f"{health_status['total_check_time_ms']:.0f}ms")
+    with col2:
+        st.metric("Avg Response Time", f"{health_status['average_response_time_ms']:.0f}ms")
+    with col3:
+        target = health_status['sla_metrics']['target_response_time_ms']
+        st.metric("Target Response Time", f"<{target}ms")
+    
+    st.divider()
+    
+    # Display individual service checks
+    st.subheader("Service Health Checks")
+    
+    for check in health_status["checks"]:
+        with st.expander(f"{check['service']} - {check['status'].upper()}", expanded=True):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if check['status'] == "healthy":
+                    st.success(check['message'])
+                elif check['status'] == "degraded":
+                    st.warning(check['message'])
+                else:
+                    st.error(check['message'])
+            with col2:
+                st.metric("Response Time", f"{check['response_time_ms']:.0f}ms")
+            
+            if check.get('details'):
+                st.json(check['details'])
+    
+    st.divider()
+    
+    # Display SLA targets
+    st.subheader("SLA Targets")
+    sla = health_status['sla_metrics']
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.info(f"**Target SLA:** {sla['target_sla']}")
+    with col2:
+        st.info(f"**Target Response:** <{sla['target_response_time_ms']}ms")
+    with col3:
+        st.info(f"**Target Error Rate:** <{sla['target_error_rate']}")
+    
+    st.divider()
+    
+    # Display raw JSON
+    with st.expander("Raw JSON Output", expanded=False):
+        st.json(health_status)
+    
+    st.caption(f"Last updated: {health_status['timestamp']}")
+
+
 def main():
     """Main application entry point."""
+    # Check if health check is requested via query params
+    query_params = st.query_params
+    if "health" in query_params or query_params.get("mode") == "health":
+        render_health_check()
+        return
+    
     # Page config
     st.set_page_config(
         page_title="De Waarheidszoeker",
