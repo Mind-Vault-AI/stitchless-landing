@@ -236,19 +236,21 @@ Geef ook een unit economics analyse:
                 # Validate score - must be N/A if no evidence
                 score = analysis_data.get("score", "N/A")
                 evidence_count = analysis_data.get("evidence_count", 0)
-                summary = analysis_data.get("summary", "Geen informatie beschikbaar.")
-
+                
                 # Poka Yoke: Force N/A if evidence is below threshold
+                # and override summary to ensure consistency
                 if isinstance(evidence_count, int) and evidence_count < self.min_evidence_threshold:
                     score = "N/A"
-                    summary = "Niet genoeg bewijs gevonden om een score te geven."
+                    final_summary = "Niet genoeg bewijs gevonden om een score te geven."
+                else:
+                    final_summary = analysis_data.get("summary", "Geen informatie beschikbaar.")
 
                 analyses.append(
                     FactorAnalysis(
                         factor=analysis_data.get("factor", "Onbekend"),
                         score=str(score),
                         evidence_count=evidence_count if isinstance(evidence_count, int) else 0,
-                        summary=summary,
+                        summary=final_summary,
                         sentiment=analysis_data.get("sentiment", "onbekend"),
                         sources=analysis_data.get("sources", []),
                     )

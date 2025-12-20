@@ -37,7 +37,10 @@ logger = logging.getLogger(__name__)
 
 # Security constants
 SAFE_FILENAME_PATTERN = r'[^a-zA-Z0-9_]'
+MAX_FILENAME_LENGTH = 100
 MAX_URL_DISPLAY_LENGTH = 70
+MIN_QUERY_LENGTH = 2
+MAX_QUERY_LENGTH = 200
 SUSPICIOUS_XSS_PATTERNS = (
     '<script', 'javascript:', 'onerror=', 'onclick=', 'onload=', 
     'onmouseover=', 'vbscript:', 'data:text/html', '<iframe', 
@@ -56,7 +59,7 @@ def sanitize_filename(filename: str) -> str:
     # Replace any character that's not alphanumeric or underscore
     sanitized = re.sub(SAFE_FILENAME_PATTERN, '_', filename)
     # Limit length to prevent issues
-    return sanitized[:100]
+    return sanitized[:MAX_FILENAME_LENGTH]
 
 
 def validate_url(url: str) -> bool:
@@ -84,12 +87,12 @@ def validate_query(query: str) -> tuple[bool, str]:
     query = query.strip()
     
     # Check minimum length
-    if len(query) < 2:
-        return False, "Zoekopdracht is te kort. Voer minstens 2 karakters in."
+    if len(query) < MIN_QUERY_LENGTH:
+        return False, f"Zoekopdracht is te kort. Voer minstens {MIN_QUERY_LENGTH} karakters in."
     
     # Check maximum length
-    if len(query) > 200:
-        return False, "Zoekopdracht is te lang. Maximaal 200 karakters toegestaan."
+    if len(query) > MAX_QUERY_LENGTH:
+        return False, f"Zoekopdracht is te lang. Maximaal {MAX_QUERY_LENGTH} karakters toegestaan."
     
     # Check for suspicious patterns (comprehensive XSS protection)
     query_lower = query.lower()
