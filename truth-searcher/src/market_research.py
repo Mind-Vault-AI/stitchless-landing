@@ -130,7 +130,7 @@ Voorbeelden:
         except Exception as e:
             logger.error(f"Category extraction failed: {e}")
             # Fallback: use the full query as category (more reliable than first word)
-            logger.warning("Falling back to using full query as category")
+            logger.warning("Category extraction failed, using fallback logic")
             return user_query.lower()
 
     def _format_search_results_for_llm(self, results: list[SearchResult]) -> str:
