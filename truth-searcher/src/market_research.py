@@ -125,12 +125,13 @@ Voorbeelden:
                 ],
             )
             category = response.choices[0].message.content.strip().lower()
-            logger.info(f"Extracted category '{category}' from query '{user_query}'")
+            logger.info(f"Extracted category from user query")
             return category
         except Exception as e:
             logger.error(f"Category extraction failed: {e}")
-            # Fallback: use the query itself
-            return user_query.split()[0].lower()
+            # Fallback: use the full query as category (more reliable than first word)
+            logger.warning("Falling back to using full query as category")
+            return user_query.lower()
 
     def _format_search_results_for_llm(self, results: list[SearchResult]) -> str:
         """Format search results as context for LLM."""
@@ -235,7 +236,7 @@ BELANGRIJK:
         Returns:
             MarketResearchResult with category and Critical Decision Factors
         """
-        logger.info(f"Starting Phase 1 market research for: {user_query}")
+        logger.info("Starting Phase 1 market research")
 
         # Step 1: Extract category
         category = self._extract_category_from_query(user_query)
