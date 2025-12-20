@@ -129,9 +129,9 @@ Voorbeelden:
             return category
         except Exception as e:
             logger.error(f"Category extraction failed: {e}")
-            # Fallback: use the full query as category (more reliable than first word)
-            logger.warning("Category extraction failed, using fallback logic")
-            return user_query.lower()
+            # Fallback: use a generic category to avoid exposing user query
+            logger.warning("Category extraction failed, using generic fallback category")
+            return "general"
 
     def _format_search_results_for_llm(self, results: list[SearchResult]) -> str:
         """Format search results as context for LLM."""
