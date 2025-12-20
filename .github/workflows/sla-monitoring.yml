@@ -1,0 +1,269 @@
+name: SLA Monitoring & Reporting
+
+on:
+  schedule:
+    # Run every hour to update SLA metrics
+    - cron: '0 * * * *'
+  workflow_dispatch:  # Allow manual triggers
+  workflow_run:
+    workflows: ["Health Check Monitoring"]
+    types:
+      - completed
+
+jobs:
+  calculate-sla:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for SLA calculations
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Calculate SLA metrics
+        id: sla_calc
+        run: |
+          # Create Python script to calculate SLA
+          cat > calculate_sla.py << 'EOF'
+          import csv
+          import os
+          from datetime import datetime, timedelta
+          from collections import defaultdict
+          
+          # Read health check data
+          metrics_file = '.github/metrics/health_checks.csv'
+          
+          if not os.path.exists(metrics_file):
+              print("No metrics file found yet")
+              exit(0)
+          
+          data = []
+          with open(metrics_file, 'r') as f:
+              for line in f:
+                  parts = line.strip().split(',')
+                  if len(parts) >= 2:
+                      data.append({
+                          'timestamp': parts[0],
+                          'status': parts[1],
+                          'response_time': float(parts[2]) if len(parts) > 2 else 0
+                      })
+          
+          if not data:
+              print("No data available")
+              exit(0)
+          
+          # Calculate metrics for different time periods
+          now = datetime.utcnow()
+          
+          def calculate_period_metrics(hours):
+              cutoff = now - timedelta(hours=hours)
+              period_data = [d for d in data if datetime.fromisoformat(d['timestamp'].replace('Z', '+00:00')) > cutoff]
+              
+              if not period_data:
+                  return None
+              
+              total = len(period_data)
+              healthy = sum(1 for d in period_data if d['status'] == 'healthy')
+              degraded = sum(1 for d in period_data if d['status'] == 'degraded')
+              unhealthy = sum(1 for d in period_data if d['status'] == 'unhealthy')
+              
+              uptime_pct = (healthy / total * 100) if total > 0 else 0
+              
+              # Calculate average response time
+              response_times = [d['response_time'] for d in period_data if d['response_time'] > 0]
+              avg_response = sum(response_times) / len(response_times) if response_times else 0
+              
+              # Calculate downtime in minutes (5 min intervals)
+              downtime_minutes = unhealthy * 5
+              
+              return {
+                  'total_checks': total,
+                  'healthy': healthy,
+                  'degraded': degraded,
+                  'unhealthy': unhealthy,
+                  'uptime_pct': round(uptime_pct, 3),
+                  'avg_response_ms': round(avg_response, 2),
+                  'downtime_minutes': downtime_minutes
+              }
+          
+          # Calculate for different periods
+          last_hour = calculate_period_metrics(1)
+          last_24h = calculate_period_metrics(24)
+          last_7d = calculate_period_metrics(24 * 7)
+          last_30d = calculate_period_metrics(24 * 30)
+          
+          # Output results
+          print(f"LAST_HOUR_UPTIME={last_hour['uptime_pct'] if last_hour else 'N/A'}")
+          print(f"LAST_24H_UPTIME={last_24h['uptime_pct'] if last_24h else 'N/A'}")
+          print(f"LAST_7D_UPTIME={last_7d['uptime_pct'] if last_7d else 'N/A'}")
+          print(f"LAST_30D_UPTIME={last_30d['uptime_pct'] if last_30d else 'N/A'}")
+          print(f"LAST_30D_DOWNTIME={last_30d['downtime_minutes'] if last_30d else 'N/A'}")
+          print(f"AVG_RESPONSE_TIME={last_24h['avg_response_ms'] if last_24h else 'N/A'}")
+          
+          # Save to output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              if last_hour:
+                  f.write(f"last_hour_uptime={last_hour['uptime_pct']}\n")
+              if last_24h:
+                  f.write(f"last_24h_uptime={last_24h['uptime_pct']}\n")
+                  f.write(f"avg_response_time={last_24h['avg_response_ms']}\n")
+              if last_7d:
+                  f.write(f"last_7d_uptime={last_7d['uptime_pct']}\n")
+              if last_30d:
+                  f.write(f"last_30d_uptime={last_30d['uptime_pct']}\n")
+                  f.write(f"last_30d_downtime={last_30d['downtime_minutes']}\n")
+          EOF
+          
+          python calculate_sla.py
+      
+      - name: Update SLA Dashboard
+        run: |
+          # Create or update SLA Dashboard
+          cat > SLA-DASHBOARD.md << 'EOF'
+          # SLA Dashboard - Truth Searcher System
+          
+          **Last Updated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          ## 🎯 SLA Targets
+          
+          | Metric | Target | Status |
+          |--------|--------|--------|
+          | System Uptime | 99.9% | ${{ steps.sla_calc.outputs.last_30d_uptime >= 99.9 && '✅ Met' || '⚠️ At Risk' }} |
+          | Response Time (95th percentile) | <2000ms | ${{ steps.sla_calc.outputs.avg_response_time < 2000 && '✅ Met' || '⚠️ At Risk' }} |
+          | Error Rate | <0.1% | Monitoring |
+          | Max Downtime (per month) | 43.8 minutes | ${{ steps.sla_calc.outputs.last_30d_downtime < 43.8 && '✅ Within Limit' || '⚠️ Exceeded' }} |
+          
+          ## 📊 Current Metrics
+          
+          ### Uptime Statistics
+          
+          | Period | Uptime % | Downtime (minutes) |
+          |--------|----------|-------------------|
+          | Last Hour | ${{ steps.sla_calc.outputs.last_hour_uptime || 'N/A' }}% | - |
+          | Last 24 Hours | ${{ steps.sla_calc.outputs.last_24h_uptime || 'N/A' }}% | - |
+          | Last 7 Days | ${{ steps.sla_calc.outputs.last_7d_uptime || 'N/A' }}% | - |
+          | Last 30 Days | ${{ steps.sla_calc.outputs.last_30d_uptime || 'N/A' }}% | ${{ steps.sla_calc.outputs.last_30d_downtime || 'N/A' }} |
+          
+          ### Performance Metrics
+          
+          | Metric | Current Value | Target |
+          |--------|--------------|---------|
+          | Average Response Time | ${{ steps.sla_calc.outputs.avg_response_time || 'N/A' }}ms | <2000ms |
+          | Health Check Interval | 5 minutes | 5 minutes |
+          | Alert Threshold | 2 consecutive failures | 2 consecutive failures |
+          
+          ## 🔍 Monitored Services
+          
+          - ✅ **OpenAI API** - Primary AI service for analysis
+          - ✅ **SerpAPI** - Primary search provider (optional)
+          - ✅ **DuckDuckGo** - Fallback search provider
+          - ✅ **Application Core** - Core application modules
+          
+          ## 📈 Health Status Legend
+          
+          - **Healthy** (🟢): All systems operational
+          - **Degraded** (🟡): Non-critical services affected, fallbacks active
+          - **Unhealthy** (🔴): Critical services down, manual intervention required
+          
+          ## 🚨 Recent Incidents
+          
+          See [Issues with label: health-alert](../../issues?q=is%3Aissue+label%3Ahealth-alert)
+          
+          ## 📋 Monitoring Details
+          
+          - **Monitoring Frequency:** Every 5 minutes
+          - **Data Retention:** 30 days
+          - **Alert Method:** GitHub Issues + Workflow failures
+          - **Recovery:** Automated monitoring, manual intervention for critical failures
+          
+          ## 🔗 Quick Links
+          
+          - [Health Check Workflow](../../actions/workflows/health-check.yml)
+          - [SLA Monitoring Workflow](../../actions/workflows/sla-monitoring.yml)
+          - [Monitoring Documentation](./MONITORING.md)
+          - [Health Check Metrics](.github/metrics/health_checks.csv)
+          
+          ---
+          
+          *This dashboard is automatically updated by the SLA Monitoring workflow.*
+          EOF
+      
+      - name: Commit SLA Dashboard
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add SLA-DASHBOARD.md
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update SLA Dashboard [skip ci]"
+          git push || true
+      
+      - name: Check SLA compliance
+        id: sla_check
+        run: |
+          # Check if we're meeting SLA targets
+          UPTIME=${{ steps.sla_calc.outputs.last_30d_uptime || 100 }}
+          DOWNTIME=${{ steps.sla_calc.outputs.last_30d_downtime || 0 }}
+          
+          echo "30-day uptime: ${UPTIME}%"
+          echo "30-day downtime: ${DOWNTIME} minutes"
+          
+          if (( $(echo "$UPTIME < 99.9" | bc -l) )); then
+            echo "::warning::SLA target not met: ${UPTIME}% < 99.9%"
+            echo "sla_met=false" >> $GITHUB_OUTPUT
+          else
+            echo "::notice::SLA target met: ${UPTIME}% >= 99.9%"
+            echo "sla_met=true" >> $GITHUB_OUTPUT
+          fi
+          
+          if (( $(echo "$DOWNTIME > 43.8" | bc -l) )); then
+            echo "::warning::Downtime exceeded: ${DOWNTIME} minutes > 43.8 minutes"
+          fi
+      
+      - name: Create SLA violation alert
+        if: steps.sla_check.outputs.sla_met == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '⚠️ SLA Violation: Uptime Below 99.9%';
+            const body = `## SLA Violation Alert
+            
+            The Truth Searcher system has fallen below the 99.9% uptime SLA target.
+            
+            **30-Day Uptime:** ${{ steps.sla_calc.outputs.last_30d_uptime }}%
+            **30-Day Downtime:** ${{ steps.sla_calc.outputs.last_30d_downtime }} minutes
+            **SLA Target:** 99.9% (max 43.8 minutes downtime/month)
+            
+            ### Required Actions
+            1. Review recent incidents and health alerts
+            2. Identify root causes of downtime
+            3. Implement corrective measures
+            4. Update incident response procedures
+            
+            ### Recent Performance
+            - **Last 7 Days:** ${{ steps.sla_calc.outputs.last_7d_uptime }}%
+            - **Last 24 Hours:** ${{ steps.sla_calc.outputs.last_24h_uptime }}%
+            
+            See [SLA Dashboard](../../blob/main/SLA-DASHBOARD.md) for detailed metrics.
+            `;
+            
+            // Check if there's already an open SLA violation issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'sla-violation,automated'
+            });
+            
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['sla-violation', 'automated', 'urgent']
+              });
+            }
