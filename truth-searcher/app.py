@@ -463,6 +463,10 @@ def main():
 
         # Download buttons
         col1, col2 = st.columns(2)
+        
+        # Sanitize product name for filename (used in both downloads)
+        safe_product_name = sanitize_filename(analysis_result.product_name)
+        timestamp = datetime.now().strftime('%Y%m%d')
 
         with col1:
             try:
@@ -470,12 +474,10 @@ def main():
                     analysis_result,
                     st.session_state.simplified_summary,
                 )
-                # Sanitize product name for filename
-                safe_product_name = sanitize_filename(analysis_result.product_name)
                 st.download_button(
                     label=UI_MESSAGES["download_pdf"],
                     data=pdf_bytes,
-                    file_name=f"waarheidszoeker_{safe_product_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    file_name=f"waarheidszoeker_{safe_product_name}_{timestamp}.pdf",
                     mime="application/pdf",
                     type="primary",
                 )
@@ -490,12 +492,10 @@ def main():
                 analysis_result,
                 st.session_state.simplified_summary,
             )
-            # Sanitize product name for filename
-            safe_product_name = sanitize_filename(analysis_result.product_name)
             st.download_button(
                 label="📄 Download Tekst Rapport",
                 data=text_report,
-                file_name=f"waarheidszoeker_{safe_product_name}_{datetime.now().strftime('%Y%m%d')}.txt",
+                file_name=f"waarheidszoeker_{safe_product_name}_{timestamp}.txt",
                 mime="text/plain",
             )
 
