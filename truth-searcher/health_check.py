@@ -11,7 +11,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class HealthChecker:
                     status="unhealthy",
                     response_time_ms=0,
                     message="OpenAI API key not configured",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     details={"error": "Missing API key"}
                 )
             
@@ -74,7 +74,7 @@ class HealthChecker:
                     status="healthy",
                     response_time_ms=response_time_ms,
                     message="OpenAI API is responding",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     details={"model": "gpt-3.5-turbo"}
                 )
             else:
@@ -83,7 +83,7 @@ class HealthChecker:
                     status="degraded",
                     response_time_ms=response_time_ms,
                     message="OpenAI API returned empty response",
-                    timestamp=datetime.utcnow().isoformat()
+                    timestamp=datetime.now(timezone.utc).isoformat()
                 )
                 
         except ImportError as e:
@@ -92,7 +92,7 @@ class HealthChecker:
                 status="unhealthy",
                 response_time_ms=(time.time() - start_time) * 1000,
                 message="OpenAI library not available",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 details={"error": str(e)}
             )
         except Exception as e:
@@ -102,7 +102,7 @@ class HealthChecker:
                 status="unhealthy",
                 response_time_ms=(time.time() - start_time) * 1000,
                 message=f"OpenAI API error: {str(e)[:100]}",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 details={"error": str(e)}
             )
 
@@ -121,7 +121,7 @@ class HealthChecker:
                     status="degraded",
                     response_time_ms=0,
                     message="SerpAPI key not configured (optional)",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     details={"note": "Will fallback to DuckDuckGo"}
                 )
             
@@ -144,7 +144,7 @@ class HealthChecker:
                     status="unhealthy",
                     response_time_ms=response_time_ms,
                     message=f"SerpAPI error: {result['error']}",
-                    timestamp=datetime.utcnow().isoformat(),
+                    timestamp=datetime.now(timezone.utc).isoformat(),
                     details={"error": result["error"]}
                 )
             
@@ -153,7 +153,7 @@ class HealthChecker:
                 status="healthy",
                 response_time_ms=response_time_ms,
                 message="SerpAPI is responding",
-                timestamp=datetime.utcnow().isoformat()
+                timestamp=datetime.now(timezone.utc).isoformat()
             )
             
         except ImportError:
@@ -162,7 +162,7 @@ class HealthChecker:
                 status="degraded",
                 response_time_ms=(time.time() - start_time) * 1000,
                 message="SerpAPI library not available",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 details={"note": "Will fallback to DuckDuckGo"}
             )
         except Exception as e:
@@ -172,7 +172,7 @@ class HealthChecker:
                 status="unhealthy",
                 response_time_ms=(time.time() - start_time) * 1000,
                 message=f"SerpAPI error: {str(e)[:100]}",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 details={"error": str(e)}
             )
 
@@ -196,7 +196,7 @@ class HealthChecker:
                     status="healthy",
                     response_time_ms=response_time_ms,
                     message="DuckDuckGo is responding",
-                    timestamp=datetime.utcnow().isoformat()
+                    timestamp=datetime.now(timezone.utc).isoformat()
                 )
             else:
                 return HealthCheckResult(
@@ -204,7 +204,7 @@ class HealthChecker:
                     status="degraded",
                     response_time_ms=response_time_ms,
                     message="DuckDuckGo returned no results",
-                    timestamp=datetime.utcnow().isoformat()
+                    timestamp=datetime.now(timezone.utc).isoformat()
                 )
                 
         except ImportError:
@@ -213,7 +213,7 @@ class HealthChecker:
                 status="unhealthy",
                 response_time_ms=(time.time() - start_time) * 1000,
                 message="DuckDuckGo library not available",
-                timestamp=datetime.utcnow().isoformat()
+                timestamp=datetime.now(timezone.utc).isoformat()
             )
         except Exception as e:
             logger.error(f"DuckDuckGo health check failed: {e}")
@@ -222,7 +222,7 @@ class HealthChecker:
                 status="unhealthy",
                 response_time_ms=(time.time() - start_time) * 1000,
                 message=f"DuckDuckGo error: {str(e)[:100]}",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 details={"error": str(e)}
             )
 
@@ -248,7 +248,7 @@ class HealthChecker:
                 status="healthy",
                 response_time_ms=response_time_ms,
                 message="Application modules are operational",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 details={"model": config.model_name}
             )
             
@@ -259,7 +259,7 @@ class HealthChecker:
                 status="unhealthy",
                 response_time_ms=(time.time() - start_time) * 1000,
                 message=f"Application error: {str(e)[:100]}",
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
                 details={"error": str(e)}
             )
 
@@ -277,13 +277,16 @@ class HealthChecker:
         total_time_ms = (time.time() - start_time) * 1000
         
         # Determine overall status
-        statuses = [check.status for check in self.checks]
-        if any(status == "unhealthy" for status in statuses if check.service in ["Application", "OpenAI API"]):
+        critical_services = ["Application", "OpenAI API"]
+        critical_checks = [c for c in self.checks if c.service in critical_services]
+        critical_unhealthy = any(c.status == "unhealthy" for c in critical_checks)
+        
+        if critical_unhealthy:
             # Critical services unhealthy
             overall_status = "unhealthy"
-        elif "unhealthy" in statuses:
+        elif any(c.status == "unhealthy" for c in self.checks):
             overall_status = "degraded"
-        elif "degraded" in statuses:
+        elif any(c.status == "degraded" for c in self.checks):
             overall_status = "degraded"
         else:
             overall_status = "healthy"
@@ -293,7 +296,7 @@ class HealthChecker:
         
         return {
             "status": overall_status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "total_check_time_ms": round(total_time_ms, 2),
             "average_response_time_ms": round(avg_response_time, 2),
             "checks": [
