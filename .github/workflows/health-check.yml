@@ -90,13 +90,10 @@ jobs:
           CONSECUTIVE=0
           
           if [ "$(echo "$LAST_TWO" | wc -l)" -eq 2 ]; then
-            # Check if both lines contain 'unhealthy'
-            if echo "$LAST_TWO" | grep -q "unhealthy"; then
-              FIRST=$(echo "$LAST_TWO" | head -n 1)
-              SECOND=$(echo "$LAST_TWO" | tail -n 1)
-              if [ "$FIRST" = "unhealthy" ] && [ "$SECOND" = "unhealthy" ]; then
-                CONSECUTIVE=2
-              fi
+            FIRST=$(echo "$LAST_TWO" | head -n 1)
+            SECOND=$(echo "$LAST_TWO" | tail -n 1)
+            if [ "$FIRST" = "unhealthy" ] && [ "$SECOND" = "unhealthy" ]; then
+              CONSECUTIVE=2
             fi
           fi
           
