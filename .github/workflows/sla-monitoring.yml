@@ -32,7 +32,7 @@ jobs:
           cat > calculate_sla.py << 'EOF'
           import csv
           import os
-          from datetime import datetime, timedelta
+          from datetime import datetime, timedelta, timezone
           from collections import defaultdict
           
           # Read health check data
@@ -58,7 +58,7 @@ jobs:
               exit(0)
           
           # Calculate metrics for different time periods
-          now = datetime.utcnow()
+          now = datetime.now(timezone.utc)
           
           def calculate_period_metrics(hours):
               cutoff = now - timedelta(hours=hours)
@@ -126,7 +126,7 @@ jobs:
           # Create Python script to generate dashboard
           cat > generate_dashboard.py << 'EOFPY'
           import os
-          from datetime import datetime
+          from datetime import datetime, timezone
           
           # Get outputs from previous step
           last_hour_uptime = "${{ steps.sla_calc.outputs.last_hour_uptime }}"
@@ -165,7 +165,7 @@ jobs:
           # Generate dashboard
           dashboard = f"""# SLA Dashboard - Truth Searcher System
 
-**Last Updated:** {datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")}
+**Last Updated:** {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}
 
 ## 🎯 SLA Targets
 
