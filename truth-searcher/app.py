@@ -37,11 +37,12 @@ logger = logging.getLogger(__name__)
 
 # Security constants
 SAFE_FILENAME_PATTERN = r'[^a-zA-Z0-9_]'
-SUSPICIOUS_XSS_PATTERNS = [
+MAX_URL_DISPLAY_LENGTH = 70
+SUSPICIOUS_XSS_PATTERNS = (
     '<script', 'javascript:', 'onerror=', 'onclick=', 'onload=', 
     'onmouseover=', 'vbscript:', 'data:text/html', '<iframe', 
     '<object', '<embed', 'onfocus=', 'onblur='
-]
+)
 
 
 def sanitize_filename(filename: str) -> str:
@@ -293,7 +294,10 @@ def render_sources(analysis_result: ProductAnalysisResult):
             if valid_sources:
                 for source in valid_sources:
                     # Truncate long URLs for display
-                    display_url = source if len(source) <= 70 else source[:67] + "..."
+                    if len(source) <= MAX_URL_DISPLAY_LENGTH:
+                        display_url = source
+                    else:
+                        display_url = source[:MAX_URL_DISPLAY_LENGTH - 3] + "..."
                     st.markdown(f"- [{display_url}]({source})")
             else:
                 st.info("Geen geldige bronnen beschikbaar.")
