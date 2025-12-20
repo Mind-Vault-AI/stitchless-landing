@@ -85,12 +85,25 @@ jobs:
         if: steps.health_check.outputs.status != 'healthy'
         id: check_failures
         run: |
-          # Count consecutive failures (last 2 entries)
-          FAILURES=$(tail -n 2 .github/metrics/health_checks.csv | grep -c "unhealthy" || echo "0")
-          echo "consecutive_failures=$FAILURES" >> $GITHUB_OUTPUT
+          # Check if last 2 entries are both unhealthy (true consecutive failures)
+          LAST_TWO=$(tail -n 2 .github/metrics/health_checks.csv | cut -d',' -f2)
+          CONSECUTIVE=0
+          
+          if [ "$(echo "$LAST_TWO" | wc -l)" -eq 2 ]; then
+            # Check if both lines contain 'unhealthy'
+            if echo "$LAST_TWO" | grep -q "unhealthy"; then
+              FIRST=$(echo "$LAST_TWO" | head -n 1)
+              SECOND=$(echo "$LAST_TWO" | tail -n 1)
+              if [ "$FIRST" = "unhealthy" ] && [ "$SECOND" = "unhealthy" ]; then
+                CONSECUTIVE=2
+              fi
+            fi
+          fi
+          
+          echo "consecutive_failures=$CONSECUTIVE" >> $GITHUB_OUTPUT
       
       - name: Create alert issue on consecutive failures
-        if: steps.check_failures.outputs.consecutive_failures >= 2
+        if: steps.check_failures.outputs.consecutive_failures == '2'
         uses: actions/github-script@v7
         with:
           script: |
