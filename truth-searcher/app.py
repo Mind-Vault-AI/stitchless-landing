@@ -39,12 +39,13 @@ logger = logging.getLogger(__name__)
 def sanitize_filename(filename: str) -> str:
     """
     Sanitize a filename to prevent path traversal attacks.
-    Only allows alphanumeric characters, hyphens, and underscores.
+    Only allows alphanumeric characters and underscores.
+    Hyphens are replaced to prevent issues with command-line tools.
     """
     # Remove any path components and only keep the basename
     filename = os.path.basename(filename)
-    # Replace any character that's not alphanumeric, hyphen, or underscore with underscore
-    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', filename)
+    # Replace any character that's not alphanumeric or underscore
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', filename)
     # Limit length to prevent issues
     return sanitized[:100]
 
@@ -81,8 +82,12 @@ def validate_query(query: str) -> tuple[bool, str]:
     if len(query) > 200:
         return False, "Zoekopdracht is te lang. Maximaal 200 karakters toegestaan."
     
-    # Check for suspicious patterns (basic check)
-    suspicious_patterns = ['<script', 'javascript:', 'onerror=', 'onclick=']
+    # Check for suspicious patterns (comprehensive XSS protection)
+    suspicious_patterns = [
+        '<script', 'javascript:', 'onerror=', 'onclick=', 'onload=', 
+        'onmouseover=', 'vbscript:', 'data:text/html', '<iframe', 
+        '<object', '<embed', 'onfocus=', 'onblur='
+    ]
     query_lower = query.lower()
     for pattern in suspicious_patterns:
         if pattern in query_lower:
@@ -423,7 +428,8 @@ def main():
             st.session_state.analysis_result = None
             st.session_state.simplified_summary = None
 
-            run_research(query.strip(), config)
+            # Query is already stripped during validation
+            run_research(query, config)
 
     # Display results
     if st.session_state.analysis_result:
