@@ -123,75 +123,122 @@ jobs:
       
       - name: Update SLA Dashboard
         run: |
-          # Create or update SLA Dashboard
-          cat > SLA-DASHBOARD.md << 'EOF'
-          # SLA Dashboard - Truth Searcher System
+          # Create Python script to generate dashboard
+          cat > generate_dashboard.py << 'EOFPY'
+          import os
+          from datetime import datetime
           
-          **Last Updated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          # Get outputs from previous step
+          last_hour_uptime = "${{ steps.sla_calc.outputs.last_hour_uptime }}"
+          last_24h_uptime = "${{ steps.sla_calc.outputs.last_24h_uptime }}"
+          last_7d_uptime = "${{ steps.sla_calc.outputs.last_7d_uptime }}"
+          last_30d_uptime = "${{ steps.sla_calc.outputs.last_30d_uptime }}"
+          last_30d_downtime = "${{ steps.sla_calc.outputs.last_30d_downtime }}"
+          avg_response_time = "${{ steps.sla_calc.outputs.avg_response_time }}"
           
-          ## 🎯 SLA Targets
+          # Calculate status indicators
+          def get_uptime_status(uptime_str):
+              try:
+                  uptime = float(uptime_str)
+                  return "✅ Met" if uptime >= 99.9 else "⚠️ At Risk"
+              except:
+                  return "🔄 Monitoring"
           
-          | Metric | Target | Status |
-          |--------|--------|--------|
-          | System Uptime | 99.9% | ${{ steps.sla_calc.outputs.last_30d_uptime >= 99.9 && '✅ Met' || '⚠️ At Risk' }} |
-          | Response Time (95th percentile) | <2000ms | ${{ steps.sla_calc.outputs.avg_response_time < 2000 && '✅ Met' || '⚠️ At Risk' }} |
-          | Error Rate | <0.1% | Monitoring |
-          | Max Downtime (per month) | 43.8 minutes | ${{ steps.sla_calc.outputs.last_30d_downtime < 43.8 && '✅ Within Limit' || '⚠️ Exceeded' }} |
+          def get_response_status(response_str):
+              try:
+                  response = float(response_str)
+                  return "✅ Met" if response < 2000 else "⚠️ At Risk"
+              except:
+                  return "🔄 Monitoring"
           
-          ## 📊 Current Metrics
+          def get_downtime_status(downtime_str):
+              try:
+                  downtime = float(downtime_str)
+                  return "✅ Within Limit" if downtime < 43.8 else "⚠️ Exceeded"
+              except:
+                  return "🔄 Monitoring"
           
-          ### Uptime Statistics
+          uptime_status = get_uptime_status(last_30d_uptime)
+          response_status = get_response_status(avg_response_time)
+          downtime_status = get_downtime_status(last_30d_downtime)
           
-          | Period | Uptime % | Downtime (minutes) |
-          |--------|----------|-------------------|
-          | Last Hour | ${{ steps.sla_calc.outputs.last_hour_uptime || 'N/A' }}% | - |
-          | Last 24 Hours | ${{ steps.sla_calc.outputs.last_24h_uptime || 'N/A' }}% | - |
-          | Last 7 Days | ${{ steps.sla_calc.outputs.last_7d_uptime || 'N/A' }}% | - |
-          | Last 30 Days | ${{ steps.sla_calc.outputs.last_30d_uptime || 'N/A' }}% | ${{ steps.sla_calc.outputs.last_30d_downtime || 'N/A' }} |
+          # Generate dashboard
+          dashboard = f"""# SLA Dashboard - Truth Searcher System
+
+**Last Updated:** {datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")}
+
+## 🎯 SLA Targets
+
+| Metric | Target | Status |
+|--------|--------|--------|
+| System Uptime | 99.9% | {uptime_status} |
+| Response Time (95th percentile) | <2000ms | {response_status} |
+| Error Rate | <0.1% | Monitoring |
+| Max Downtime (per month) | 43.8 minutes | {downtime_status} |
+
+## 📊 Current Metrics
+
+### Uptime Statistics
+
+| Period | Uptime % | Downtime (minutes) |
+|--------|----------|-------------------|
+| Last Hour | {last_hour_uptime or 'N/A'}% | - |
+| Last 24 Hours | {last_24h_uptime or 'N/A'}% | - |
+| Last 7 Days | {last_7d_uptime or 'N/A'}% | - |
+| Last 30 Days | {last_30d_uptime or 'N/A'}% | {last_30d_downtime or 'N/A'} |
+
+### Performance Metrics
+
+| Metric | Current Value | Target |
+|--------|--------------|---------|
+| Average Response Time | {avg_response_time or 'N/A'}ms | <2000ms |
+| Health Check Interval | 5 minutes | 5 minutes |
+| Alert Threshold | 2 consecutive failures | 2 consecutive failures |
+
+## 🔍 Monitored Services
+
+- ✅ **OpenAI API** - Primary AI service for analysis
+- ✅ **SerpAPI** - Primary search provider (optional)
+- ✅ **DuckDuckGo** - Fallback search provider
+- ✅ **Application Core** - Core application modules
+
+## 📈 Health Status Legend
+
+- **Healthy** (🟢): All systems operational
+- **Degraded** (🟡): Non-critical services affected, fallbacks active
+- **Unhealthy** (🔴): Critical services down, manual intervention required
+
+## 🚨 Recent Incidents
+
+See [Issues with label: health-alert](../../issues?q=is%3Aissue+label%3Ahealth-alert)
+
+## 📋 Monitoring Details
+
+- **Monitoring Frequency:** Every 5 minutes
+- **Data Retention:** 30 days
+- **Alert Method:** GitHub Issues + Workflow failures
+- **Recovery:** Automated monitoring, manual intervention for critical failures
+
+## 🔗 Quick Links
+
+- [Health Check Workflow](../../actions/workflows/health-check.yml)
+- [SLA Monitoring Workflow](../../actions/workflows/sla-monitoring.yml)
+- [Monitoring Documentation](./MONITORING.md)
+- [Health Check Metrics](.github/metrics/health_checks.csv)
+
+---
+
+*This dashboard is automatically updated by the SLA Monitoring workflow.*
+"""
           
-          ### Performance Metrics
+          # Write dashboard
+          with open('SLA-DASHBOARD.md', 'w') as f:
+              f.write(dashboard)
           
-          | Metric | Current Value | Target |
-          |--------|--------------|---------|
-          | Average Response Time | ${{ steps.sla_calc.outputs.avg_response_time || 'N/A' }}ms | <2000ms |
-          | Health Check Interval | 5 minutes | 5 minutes |
-          | Alert Threshold | 2 consecutive failures | 2 consecutive failures |
+          print("✅ Dashboard generated successfully")
+          EOFPY
           
-          ## 🔍 Monitored Services
-          
-          - ✅ **OpenAI API** - Primary AI service for analysis
-          - ✅ **SerpAPI** - Primary search provider (optional)
-          - ✅ **DuckDuckGo** - Fallback search provider
-          - ✅ **Application Core** - Core application modules
-          
-          ## 📈 Health Status Legend
-          
-          - **Healthy** (🟢): All systems operational
-          - **Degraded** (🟡): Non-critical services affected, fallbacks active
-          - **Unhealthy** (🔴): Critical services down, manual intervention required
-          
-          ## 🚨 Recent Incidents
-          
-          See [Issues with label: health-alert](../../issues?q=is%3Aissue+label%3Ahealth-alert)
-          
-          ## 📋 Monitoring Details
-          
-          - **Monitoring Frequency:** Every 5 minutes
-          - **Data Retention:** 30 days
-          - **Alert Method:** GitHub Issues + Workflow failures
-          - **Recovery:** Automated monitoring, manual intervention for critical failures
-          
-          ## 🔗 Quick Links
-          
-          - [Health Check Workflow](../../actions/workflows/health-check.yml)
-          - [SLA Monitoring Workflow](../../actions/workflows/sla-monitoring.yml)
-          - [Monitoring Documentation](./MONITORING.md)
-          - [Health Check Metrics](.github/metrics/health_checks.csv)
-          
-          ---
-          
-          *This dashboard is automatically updated by the SLA Monitoring workflow.*
-          EOF
+          python3 generate_dashboard.py
       
       - name: Commit SLA Dashboard
         run: |
@@ -211,17 +258,24 @@ jobs:
           echo "30-day uptime: ${UPTIME}%"
           echo "30-day downtime: ${DOWNTIME} minutes"
           
-          if (( $(echo "$UPTIME < 99.9" | bc -l) )); then
-            echo "::warning::SLA target not met: ${UPTIME}% < 99.9%"
-            echo "sla_met=false" >> $GITHUB_OUTPUT
-          else
-            echo "::notice::SLA target met: ${UPTIME}% >= 99.9%"
-            echo "sla_met=true" >> $GITHUB_OUTPUT
-          fi
+          # Use Python for floating-point comparison (bc not available by default)
+          python3 << EOF
+          import sys
+          uptime = float("${UPTIME}")
+          downtime = float("${DOWNTIME}")
           
-          if (( $(echo "$DOWNTIME > 43.8" | bc -l) )); then
-            echo "::warning::Downtime exceeded: ${DOWNTIME} minutes > 43.8 minutes"
-          fi
+          if uptime < 99.9:
+              print("::warning::SLA target not met: {}% < 99.9%".format(uptime))
+              with open('$GITHUB_OUTPUT', 'a') as f:
+                  f.write("sla_met=false\n")
+          else:
+              print("::notice::SLA target met: {}% >= 99.9%".format(uptime))
+              with open('$GITHUB_OUTPUT', 'a') as f:
+                  f.write("sla_met=true\n")
+          
+          if downtime > 43.8:
+              print("::warning::Downtime exceeded: {} minutes > 43.8 minutes".format(downtime))
+          EOF
       
       - name: Create SLA violation alert
         if: steps.sla_check.outputs.sla_met == 'false'

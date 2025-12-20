@@ -67,6 +67,7 @@ streamlit run app.py
 ```
 truth-searcher/
 ├── app.py                    # Main Streamlit application
+├── health_check.py           # Health check & monitoring module
 ├── requirements.txt          # Python dependencies
 ├── .env.example             # Environment template
 ├── README.md                # This file
@@ -78,6 +79,44 @@ truth-searcher/
     ├── review_analyzer.py   # Phase 2: Evidence-based scoring
     └── pdf_generator.py     # Phase 3: Report generation
 ```
+
+## 🏥 Health Check & Monitoring
+
+The application includes comprehensive health monitoring to achieve **99.9% SLA** targets:
+
+### Access Health Check
+```bash
+# Via Streamlit app
+streamlit run app.py
+# Visit: http://localhost:8501/?health=true
+```
+
+### Health Check Features
+- ✅ OpenAI API connectivity monitoring
+- ✅ Search services health (SerpAPI, DuckDuckGo)
+- ✅ Application core functionality checks
+- ✅ Response time metrics
+- ✅ JSON status output
+
+### Monitoring Dashboard
+See [SLA-DASHBOARD.md](../SLA-DASHBOARD.md) for:
+- Real-time uptime metrics
+- Performance statistics
+- Incident tracking
+- SLA compliance status
+
+### Documentation
+See [MONITORING.md](../MONITORING.md) for:
+- Complete monitoring architecture
+- Alert procedures
+- Recovery mechanisms
+- Configuration options
+
+### SLA Targets
+- **Uptime:** 99.9% (max 43.8 min downtime/month)
+- **Response Time:** <2000ms (95th percentile)
+- **Error Rate:** <0.1%
+- **Check Interval:** 5 minutes
 
 ## 🔧 Architecture
 
