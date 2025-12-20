@@ -236,17 +236,19 @@ Geef ook een unit economics analyse:
                 # Validate score - must be N/A if no evidence
                 score = analysis_data.get("score", "N/A")
                 evidence_count = analysis_data.get("evidence_count", 0)
+                summary = analysis_data.get("summary", "Geen informatie beschikbaar.")
 
                 # Poka Yoke: Force N/A if evidence is below threshold
                 if isinstance(evidence_count, int) and evidence_count < self.min_evidence_threshold:
                     score = "N/A"
+                    summary = "Niet genoeg bewijs gevonden om een score te geven."
 
                 analyses.append(
                     FactorAnalysis(
                         factor=analysis_data.get("factor", "Onbekend"),
                         score=str(score),
                         evidence_count=evidence_count if isinstance(evidence_count, int) else 0,
-                        summary=analysis_data.get("summary", "Geen informatie beschikbaar."),
+                        summary=summary,
                         sentiment=analysis_data.get("sentiment", "onbekend"),
                         sources=analysis_data.get("sources", []),
                     )
@@ -348,7 +350,7 @@ Geef ook een unit economics analyse:
         Returns:
             ProductAnalysisResult with scores and evidence
         """
-        logger.info(f"Starting Phase 2 product analysis for: {product_name}")
+        logger.info("Starting Phase 2 product analysis")
 
         # Step 1: Build and execute review search queries
         queries = self._build_review_queries(product_name)

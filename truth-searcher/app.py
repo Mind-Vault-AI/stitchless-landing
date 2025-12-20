@@ -11,8 +11,10 @@ Version: 1.0.0
 
 import logging
 import os
+import re
 import sys
 from datetime import datetime
+from urllib.parse import urlparse
 
 import pandas as pd
 import streamlit as st
@@ -32,6 +34,61 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize a filename to prevent path traversal attacks.
+    Only allows alphanumeric characters, hyphens, and underscores.
+    """
+    # Remove any path components and only keep the basename
+    filename = os.path.basename(filename)
+    # Replace any character that's not alphanumeric, hyphen, or underscore with underscore
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', filename)
+    # Limit length to prevent issues
+    return sanitized[:100]
+
+
+def validate_url(url: str) -> bool:
+    """
+    Validate that a URL is safe to display.
+    Only allows http and https schemes.
+    """
+    try:
+        parsed = urlparse(url)
+        # Only allow http and https schemes
+        return parsed.scheme in ('http', 'https') and bool(parsed.netloc)
+    except Exception:
+        return False
+
+
+def validate_query(query: str) -> tuple[bool, str]:
+    """
+    Validate user input query.
+    Returns (is_valid, error_message).
+    """
+    if not query or not query.strip():
+        return False, "Voer alstublieft een zoekopdracht in."
+    
+    # Remove leading/trailing whitespace
+    query = query.strip()
+    
+    # Check minimum length
+    if len(query) < 2:
+        return False, "Zoekopdracht is te kort. Voer minstens 2 karakters in."
+    
+    # Check maximum length
+    if len(query) > 200:
+        return False, "Zoekopdracht is te lang. Maximaal 200 karakters toegestaan."
+    
+    # Check for suspicious patterns (basic check)
+    suspicious_patterns = ['<script', 'javascript:', 'onerror=', 'onclick=']
+    query_lower = query.lower()
+    for pattern in suspicious_patterns:
+        if pattern in query_lower:
+            return False, "Zoekopdracht bevat ongeldige karakters."
+    
+    return True, ""
 
 
 def init_session_state():
@@ -223,8 +280,15 @@ def render_sources(analysis_result: ProductAnalysisResult):
             all_sources.update(analysis.sources)
 
         if all_sources:
-            for source in all_sources:
-                st.markdown(f"- [{source[:50]}...]({source})")
+            # Validate and display URLs
+            valid_sources = [src for src in all_sources if validate_url(src)]
+            if valid_sources:
+                for source in valid_sources:
+                    # Truncate long URLs for display
+                    display_url = source if len(source) <= 70 else source[:67] + "..."
+                    st.markdown(f"- [{display_url}]({source})")
+            else:
+                st.info("Geen geldige bronnen beschikbaar.")
         else:
             st.info("Geen specifieke bronnen beschikbaar.")
 
@@ -297,7 +361,8 @@ def run_research(query: str, config: AppConfig):
 
     except Exception as e:
         logger.exception("Research pipeline failed")
-        st.error(f"❌ Er ging iets mis: {str(e)}")
+        # Don't expose internal error details to users
+        st.error("❌ Er ging iets mis tijdens het onderzoek. Probeer het later opnieuw.")
         st.session_state.current_phase = None
 
 
@@ -348,12 +413,17 @@ def main():
 
     # Execute research
     if search_button and query:
-        # Clear previous results
-        st.session_state.research_result = None
-        st.session_state.analysis_result = None
-        st.session_state.simplified_summary = None
+        # Validate input
+        is_valid, error_msg = validate_query(query)
+        if not is_valid:
+            st.error(f"⚠️ {error_msg}")
+        else:
+            # Clear previous results
+            st.session_state.research_result = None
+            st.session_state.analysis_result = None
+            st.session_state.simplified_summary = None
 
-        run_research(query, config)
+            run_research(query.strip(), config)
 
     # Display results
     if st.session_state.analysis_result:
@@ -400,27 +470,32 @@ def main():
                     analysis_result,
                     st.session_state.simplified_summary,
                 )
+                # Sanitize product name for filename
+                safe_product_name = sanitize_filename(analysis_result.product_name)
                 st.download_button(
                     label=UI_MESSAGES["download_pdf"],
                     data=pdf_bytes,
-                    file_name=f"waarheidszoeker_{analysis_result.product_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    file_name=f"waarheidszoeker_{safe_product_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
                     mime="application/pdf",
                     type="primary",
                 )
             except ImportError:
                 st.warning("PDF generatie niet beschikbaar. Installeer: pip install reportlab")
             except Exception as e:
-                st.error(f"PDF generatie mislukt: {e}")
+                logger.error(f"PDF generation failed: {e}")
+                st.error("PDF generatie mislukt. Probeer het opnieuw.")
 
         with col2:
             text_report = generate_simple_text_report(
                 analysis_result,
                 st.session_state.simplified_summary,
             )
+            # Sanitize product name for filename
+            safe_product_name = sanitize_filename(analysis_result.product_name)
             st.download_button(
                 label="📄 Download Tekst Rapport",
                 data=text_report,
-                file_name=f"waarheidszoeker_{analysis_result.product_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.txt",
+                file_name=f"waarheidszoeker_{safe_product_name}_{datetime.now().strftime('%Y%m%d')}.txt",
                 mime="text/plain",
             )
 
