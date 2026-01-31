@@ -16,6 +16,9 @@ jobs:
   health-check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
     
     steps:
       - name: Checkout repository
@@ -79,7 +82,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add .github/metrics/health_checks.csv || true
           git diff --quiet && git diff --staged --quiet || git commit -m "Update health check metrics [skip ci]"
-          git push || true
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git || true
       
       - name: Check for consecutive failures
         if: steps.health_check.outputs.status != 'healthy'
